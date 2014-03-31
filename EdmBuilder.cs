@@ -1,7 +1,7 @@
 /*****************************************************
  * Breeze Labs: EdmBuilder
  *
- * v.1.0.3
+ * v.1.0.4
  * Copyright 2014 IdeaBlade, Inc.  All Rights Reserved.  
  * Licensed under the MIT License
  * http://opensource.org/licenses/mit-license.php
@@ -26,6 +26,7 @@ namespace Microsoft.Data.Edm
 {
     /// <summary>
     /// DbContext extension that builds an "Entity Data Model" (EDM) from a <see cref="DbContext"/>
+    /// created using either Code-First or Model-First.
     /// </summary>
     /// <remarks>
     /// We need the EDM both to define the Web API OData route and as a
@@ -48,46 +49,37 @@ namespace Microsoft.Data.Edm
     public static class EdmBuilder
     {
         /// <summary>
-        /// [OBSOLETE] Builds an Entity Data Model (EDM) from an existing <see cref="DbContext"/> 
-        /// created using Code-First. Use <see cref="GetCodeFirstEdm"/> instead.
+        /// Builds an Entity Data Model (EDM) for a <see cref="DbContext"/> subclass
+        /// created using either Code-First or Model-First.
         /// </summary>
-        /// <remarks>
-        /// This method delegates directly to <see cref="GetCodeFirstEdm"/> whose
-        /// name better describes its purpose and specificity.
-        /// Deprecated for backward compatibility.
-        /// </remarks>
-        [Obsolete("This method is obsolete. Use GetCodeFirstEdm instead")]
-        public static IEdmModel GetEdm<T>(this T dbContext) where T : DbContext, new()
-        {
-            return GetCodeFirstEdm<T>(dbContext);
-        }
-
-        /// <summary>
-        /// Builds an Entity Data Model (EDM) from a <see cref="DbContext"/> created using Code-First.
-        /// Use <see cref="GetModelFirstEdm"/> for a Model-First DbContext.
-        /// </summary>
-        /// <typeparam name="T">Type of the source <see cref="DbContext"/></typeparam>
+        /// <typeparam name="T">
+        /// Type of the source <see cref="DbContext"/> with parameterless constructor. 
+        /// </typeparam>
         /// <returns>An XML <see cref="IEdmModel"/>.</returns>
+        /// <remarks>
+        /// The DbContext must have parameterless constructor as this method creates an instance.
+        /// If it doesn't, create an instance and pass it to the other
+        /// GetEdm overload (or call it as an extension method).
+        /// </remarks>
         /// <example>
         /// <![CDATA[
         /// /* In the WebApiConfig.cs */
         /// config.Routes.MapODataRoute(
         ///     routeName: "odata", 
         ///     routePrefix: "odata", 
-        ///     model: EdmBuilder.GetCodeFirstEdm<CodeFirstDbContext>(), 
+        ///     model: EdmBuilder.GetEdm<MyDbContext>(), 
         ///     batchHandler: new DefaultODataBatchHandler(GlobalConfiguration.DefaultServer)
         ///     );
         /// ]]>
         /// </example>
-        public static IEdmModel GetCodeFirstEdm<T>() where T : DbContext, new()
+        public static IEdmModel GetEdm<T>() where T : DbContext, new()
         {
-            return GetCodeFirstEdm(new T());
+            return GetEdm(new T());
         }
 
         /// <summary>
-        /// Extension method builds an Entity Data Model (EDM) from an
-        /// existing <see cref="DbContext"/> created using Code-First.
-        /// Use <see cref="GetModelFirstEdm"/> for a Model-First DbContext.
+        /// Builds an Entity Data Model (EDM) from an existing <see cref="DbContext"/> instance
+        /// created using either Code-First or Model-First (extension method).
         /// </summary>
         /// <typeparam name="T">Type of the source <see cref="DbContext"/></typeparam>
         /// <param name="dbContext">Concrete <see cref="DbContext"/> to use for EDM generation.</param>
@@ -95,21 +87,54 @@ namespace Microsoft.Data.Edm
         /// <example>
         /// <![CDATA[
         /// /* In the WebApiConfig.cs */
+        /// var context = new MyDbContext(arg1, arg2);
         /// config.Routes.MapODataRoute(
         ///     routeName: "odata", 
         ///     routePrefix: "odata", 
-        ///     model: context.GetCodeFirstEdm<>(), 
+        ///     model: context.GetEdm(), // 'GetEdm' called as an extension method
         ///     batchHandler: new DefaultODataBatchHandler(GlobalConfiguration.DefaultServer)
         ///     );
         /// ]]>
-        /// </example>
-        public static IEdmModel GetCodeFirstEdm<T>(this T dbContext)  where T : DbContext, new()
+        public static IEdmModel GetEdm<T>(this T dbContext) where T : DbContext
+        {
+            if (dbContext == null){
+                throw new NullReferenceException("dbContext must not be null.");
+            }
+
+            // Get internal context
+            var internalContext = dbContext
+                .GetType()
+                .GetProperty(INTERNALCONTEXT, BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(dbContext);
+
+            // Is code first model?
+            var isCodeFirst = internalContext
+                .GetType()
+                .GetProperty(CODEFIRSTMODEL)
+                .GetValue(internalContext) != null;
+
+            // Return the result based on the dbcontext type
+            return isCodeFirst
+                ? GetCodeFirstEdm<T>(dbContext)
+                : GetModelFirstEdm<T>(dbContext);
+        }
+
+
+
+        /// <summary>
+        /// Builds an Entity Data Model (EDM) from an
+        /// existing <see cref="DbContext"/> created using Code-First.
+        /// Use <see cref="GetModelFirstEdm"/> for a Model-First DbContext.
+        /// </summary>
+        /// <typeparam name="T">Type of the source <see cref="DbContext"/></typeparam>
+        /// <param name="dbContext">Concrete <see cref="DbContext"/> to use for EDM generation.</param>
+        /// <returns>An XML <see cref="IEdmModel"/>.</returns>
+        static IEdmModel GetCodeFirstEdm<T>(this T dbContext)  where T : DbContext
         {
             using (var stream = new MemoryStream())
             {
                 using (var writer = XmlWriter.Create(stream))
                 {
-                    dbContext = dbContext ?? new T();
                     System.Data.Entity.Infrastructure.EdmxWriter.WriteEdmx(dbContext, writer);
                 }
                 stream.Position = 0;
@@ -121,29 +146,7 @@ namespace Microsoft.Data.Edm
         }
 
         /// <summary>
-        /// Builds an Entity Data Model (EDM) from a <see cref="DbContext"/> created using Model-First.
-        /// Use <see cref="GetCodeFirstEdm"/> for a Code-First DbContext.
-        /// </summary>
-        /// <typeparam name="T">Type of the source <see cref="DbContext"/></typeparam>
-        /// <returns>An XML <see cref="IEdmModel"/>.</returns>
-        /// <example>
-        /// <![CDATA[
-        /// /* In the WebApiConfig.cs */
-        /// config.Routes.MapODataRoute(
-        ///     routeName: "odata", 
-        ///     routePrefix: "odata", 
-        ///     model: EdmBuilder.GetModelFirstEdm<ModelFirstDbContext>(), 
-        ///     batchHandler: new DefaultODataBatchHandler(GlobalConfiguration.DefaultServer)
-        ///     );
-        /// ]]>
-        /// </example>
-        public static IEdmModel GetModelFirstEdm<T>() where T : DbContext, new()
-        {
-            return GetModelFirstEdm(new T());
-        }
-
-        /// <summary>
-        /// Extension method builds an Entity Data Model (EDM) from a <see cref="DbContext"/> created using Model-First. 
+        /// Builds an Entity Data Model (EDM) from a <see cref="DbContext"/> created using Model-First. 
         /// Use <see cref="GetCodeFirstEdm"/> for a Code-First DbContext.
         /// </summary>
         /// <typeparam name="T">Type of the source <see cref="DbContext"/></typeparam>
@@ -154,21 +157,9 @@ namespace Microsoft.Data.Edm
         /// which reates the metadata from an Edmx file:
         /// https://gist.github.com/dariusclay/8673940
         /// </remarks>
-        /// <example>
-        /// <![CDATA[
-        /// /* In the WebApiConfig.cs */
-        /// config.Routes.MapODataRoute(
-        ///     routeName: "odata", 
-        ///     routePrefix: "odata", 
-        ///     model: EdmBuilder.GetModelFirstEdm<CustomDbContext>(), 
-        ///     batchHandler: new DefaultODataBatchHandler(GlobalConfiguration.DefaultServer)
-        ///     );
-        /// ]]>
-        /// </example>
         [System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Usage", "CA2202:Do not dispose objects multiple times" )]
-        public static IEdmModel GetModelFirstEdm<T>(this T dbContext) where T : DbContext, new()
+        static IEdmModel GetModelFirstEdm<T>(this T dbContext) where T : DbContext
         {
-            dbContext = dbContext ?? new T();
             using (var csdlStream = GetCsdlStreamFromMetadata(dbContext))
             {
                 using (var reader = XmlReader.Create(csdlStream))
@@ -203,7 +194,13 @@ namespace Microsoft.Data.Edm
             return assembly.GetManifestResourceStream(resourceName);
         }
 
-        // Metadata pattern to find conceptual model name
+        // Property name in InternalContext class
+        const string CODEFIRSTMODEL = "CodeFirstModel";
+
+        // Property name in DbContext class
+        const string INTERNALCONTEXT = "InternalContext";
+
+        // Pattern to find conceptual model name in connecting string metadata
         const string METADATACSDLPATTERN = "((\\w+\\.)+csdl)";
     }
 }
