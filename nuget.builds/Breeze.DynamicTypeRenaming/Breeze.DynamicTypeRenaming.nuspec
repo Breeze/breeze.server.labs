@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+    <metadata>
+        <id>Breeze.DynamicTypeRenaming</id>
+        <version>1.0.0</version>
+        <title>Breeze Labs: Dynamic Type Renaming</title>
+        <authors>Ward Bell</authors>
+        <owners>Ward Bell</owners>
+        <licenseUrl>http://www.opensource.org/licenses/mit-license.php</licenseUrl>
+        <projectUrl>http://www.breezejs.com/breeze-labs/breezeedmbuilder</projectUrl>
+        <iconUrl>http://www.breezejs.com/sites/default/files/images/BreezeLabsB.png</iconUrl>
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
+        <description>Replaces Breeze's default "BreezeConfig" with a derived version that overrides the Json.Net serialization setting responsible for the $type name property of the JSON sent to the client.
+        
+        Turns the really nasty, long dynamic or anonymous type names into acceptabe shorter names such as "_IB_DGU56or_prSk3yzZB87I8gCBWABk, Dynamic" or "&lt;&gt;f__AnonymousType6`3, Dynamic".
+        
+        See the Breeze DocCode sample for an example of usage.</description>
+        <summary>Renames nasty type names generated during serialization of projection query results.</summary>
+        <copyright>Copyright © 2014 IdeaBlade</copyright>
+        <language>en-US</language>
+        <tags>breeze labs webapi json server</tags>
+    </metadata>
+    <files>
+        <file src="..\..\CustomBreezeConfig.cs" target="content\Controllers\CustomBreezeConfig.cs" />
+        <file src="..\..\DynamicTypeRenamingSerializationBinder.cs" target="content\Controllers\DynamicTypeRenamingSerializationBinder.cs" />
+    </files>
+</package>
