@@ -9,8 +9,8 @@
  * Thanks to Javier Calvarro Nelson for the initial version
  * Thanks to Serkan Holat for the ModelFirst extension
  *****************************************************/
-using Microsoft.Data.Edm.Csdl;
-using Microsoft.Data.Edm.Validation;
+using Microsoft.OData.Edm.Csdl;
+using Microsoft.OData.Edm.Validation;
 using System;
 using System.Collections.Generic;
 using System.Data.Entity;
@@ -22,7 +22,7 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Xml;
 
-namespace Microsoft.Data.Edm
+namespace Microsoft.OData.Edm
 {
     /// <summary>
     /// DbContext extension that builds an "Entity Data Model" (EDM) from a <see cref="DbContext"/>
